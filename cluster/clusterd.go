@@ -20,8 +20,8 @@ type Clusterd interface {
 	Open(string) error
 	OnConnect(gate gate.Gate, conn net.Conn)
 
-	fetchClient(string) Client
-	OnClientExit(string)
+	fetchSender(string) Sender
+	OnSenderExit(string)
 }
 
 type skynetClusterd struct {
@@ -29,7 +29,7 @@ type skynetClusterd struct {
 
 	namedServices map[string]service.Service
 
-	nodeClient sync.Map
+	nodeSender sync.Map
 
 	gate map[string]gate.Gate
 }
@@ -54,7 +54,7 @@ func newClusterd() *skynetClusterd {
 
 func Call(node string, service string, method string, args []lua.Value) ([]lua.Value, error) {
 	c := GetClusterd()
-	client := c.fetchClient(node)
+	client := c.fetchSender(node)
 	if client == nil {
 		return nil, fmt.Errorf("no client for node: %s", node)
 	}
@@ -63,7 +63,7 @@ func Call(node string, service string, method string, args []lua.Value) ([]lua.V
 
 func Send(node string, service string, method string, args []lua.Value) error {
 	c := GetClusterd()
-	client := c.fetchClient(node)
+	client := c.fetchSender(node)
 	if client == nil {
 		return fmt.Errorf("no client for node: %s", node)
 	}
@@ -105,12 +105,12 @@ func (c *skynetClusterd) Reload(config ClusterConfig) {
 		}
 	}
 	// node address change check
-	c.nodeClient.Range(func(key, value interface{}) bool {
+	c.nodeSender.Range(func(key, value interface{}) bool {
 		name := key.(string)
-		client := value.(Client)
+		client := value.(Sender)
 		if config.NodeInfo(name) != client.RemoteAddr() {
 			client.Exit()
-			c.nodeClient.Delete(name)
+			c.nodeSender.Delete(name)
 		}
 		return true
 	})
@@ -119,34 +119,34 @@ func (c *skynetClusterd) Reload(config ClusterConfig) {
 
 var mutex sync.Mutex
 
-func (c *skynetClusterd) fetchClient(name string) Client {
+func (c *skynetClusterd) fetchSender(name string) Sender {
 	addr := c.config.NodeInfo(name)
 	if addr == "" {
 		return nil
 	}
 	// fetch first
-	if client, ok := c.nodeClient.Load(name); ok {
-		return client.(Client)
+	if client, ok := c.nodeSender.Load(name); ok {
+		return client.(Sender)
 	}
 	mutex.Lock()
 	defer mutex.Unlock()
 	// fetch again
-	if client, ok := c.nodeClient.Load(name); ok {
-		return client.(Client)
+	if client, ok := c.nodeSender.Load(name); ok {
+		return client.(Sender)
 	}
 	client, error := NewClusterClient(c, name, addr)
 	if error != nil {
 		return nil
 	}
 	client.Start()
-	c.nodeClient.Store(name, client)
+	c.nodeSender.Store(name, client)
 	return client
 }
 
-// OnClientExit implements Clusterd.
-func (c *skynetClusterd) OnClientExit(name string) {
+// OnSenderExit implements Clusterd.
+func (c *skynetClusterd) OnSenderExit(name string) {
 	log.Printf("client removed: %s", name)
-	c.nodeClient.Delete(name)
+	c.nodeSender.Delete(name)
 }
 
 func (c *skynetClusterd) OnConnect(gate gate.Gate, conn net.Conn) {

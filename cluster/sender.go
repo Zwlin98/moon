@@ -12,7 +12,7 @@ import (
 )
 
 // call/send other skynet node
-type Client interface {
+type Sender interface {
 	RemoteAddr() string
 
 	Call(string, string, []lua.Value) ([]lua.Value, error)
@@ -22,7 +22,7 @@ type Client interface {
 	Exit()
 }
 
-type skynetClient struct {
+type skynetSender struct {
 	clusterd   Clusterd
 	remoteName string
 	remoteAddr string
@@ -37,13 +37,13 @@ type skynetClient struct {
 	exit    chan struct{}
 }
 
-func NewClusterClient(clusterd Clusterd, name string, addr string) (Client, error) {
+func NewClusterClient(clusterd Clusterd, name string, addr string) (Sender, error) {
 	conn, err := net.Dial("tcp", addr)
 	if err != nil {
 		return nil, err
 	}
 
-	client := skynetClient{
+	client := skynetSender{
 		clusterd:        clusterd,
 		remoteName:      name,
 		remoteAddr:      addr,
@@ -57,7 +57,7 @@ func NewClusterClient(clusterd Clusterd, name string, addr string) (Client, erro
 	return &client, nil
 }
 
-func (sc *skynetClient) Start() {
+func (sc *skynetSender) Start() {
 	proto := gate.NewGateProto(sc.conn, sc.conn)
 
 	go func() {
@@ -98,7 +98,7 @@ func (sc *skynetClient) Start() {
 	}()
 }
 
-func (sc *skynetClient) callRet(resp Response) {
+func (sc *skynetSender) callRet(resp Response) {
 	session := resp.Session
 	retChan, ok := sc.pendingRespChan.Load(session)
 	if ok {
@@ -108,7 +108,7 @@ func (sc *skynetClient) callRet(resp Response) {
 	}
 }
 
-func (sc *skynetClient) callError(session uint32, msg string) {
+func (sc *skynetSender) callError(session uint32, msg string) {
 	sc.callRet(Response{
 		Session: session,
 		Ok:      false,
@@ -116,7 +116,7 @@ func (sc *skynetClient) callError(session uint32, msg string) {
 	})
 }
 
-func (sc *skynetClient) packCall(service string, method string, args []lua.Value, isPush bool) (PackedRequest, uint32, error) {
+func (sc *skynetSender) packCall(service string, method string, args []lua.Value, isPush bool) (PackedRequest, uint32, error) {
 	realArgs := []lua.Value{lua.String(method)}
 	realArgs = append(realArgs, args...)
 
@@ -140,7 +140,7 @@ func (sc *skynetClient) packCall(service string, method string, args []lua.Value
 }
 
 // Call implements Client.
-func (sc *skynetClient) Call(service string, method string, args []lua.Value) ([]lua.Value, error) {
+func (sc *skynetSender) Call(service string, method string, args []lua.Value) ([]lua.Value, error) {
 	packReq, session, err := sc.packCall(service, method, args, false)
 
 	if err != nil {
@@ -169,7 +169,7 @@ func (sc *skynetClient) Call(service string, method string, args []lua.Value) ([
 	}
 }
 
-func (sc *skynetClient) Send(service string, method string, args []lua.Value) error {
+func (sc *skynetSender) Send(service string, method string, args []lua.Value) error {
 	packReq, _, err := sc.packCall(service, method, args, true)
 	if err != nil {
 		return err
@@ -182,18 +182,18 @@ func (sc *skynetClient) Send(service string, method string, args []lua.Value) er
 	}
 }
 
-func (sc *skynetClient) Exit() {
+func (sc *skynetSender) Exit() {
 	log.Printf("ClusterClient %s exit", sc.name())
 	close(sc.exit)
 	sc.conn.Close()
-	sc.clusterd.OnClientExit(sc.name())
+	sc.clusterd.OnSenderExit(sc.name())
 }
 
-func (sc *skynetClient) RemoteAddr() string {
+func (sc *skynetSender) RemoteAddr() string {
 	return sc.remoteAddr
 }
 
-func (sc *skynetClient) dispatch(msg []byte) {
+func (sc *skynetSender) dispatch(msg []byte) {
 	resp, err := UnpackResponse(msg)
 	if err != nil {
 		log.Printf("failed to unpack response, %s", err.Error())
@@ -228,6 +228,6 @@ func (sc *skynetClient) dispatch(msg []byte) {
 	}
 }
 
-func (sc *skynetClient) name() string {
+func (sc *skynetSender) name() string {
 	return sc.remoteName
 }
