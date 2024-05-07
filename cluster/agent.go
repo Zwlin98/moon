@@ -9,6 +9,7 @@ import (
 	"github.com/Zwlin98/moon/lua"
 )
 
+// execute request from other skynet node
 type ClusterAgent interface {
 	Start()
 	Exit()

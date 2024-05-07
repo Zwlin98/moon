@@ -11,6 +11,7 @@ import (
 	"github.com/Zwlin98/moon/lua"
 )
 
+// call/send other skynet node
 type Client interface {
 	RemoteAddr() string
 

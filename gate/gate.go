@@ -15,7 +15,13 @@ type Gate interface {
 	RemoveClient()
 }
 
-type SkynetGate struct {
+type GateOption func(*skynetGate)
+
+type GateAgent interface {
+	OnConnect(g Gate, conn net.Conn)
+}
+
+type skynetGate struct {
 	address     string
 	listener    net.Listener
 	maxClient   int32
@@ -24,22 +30,14 @@ type SkynetGate struct {
 	agent GateAgent
 }
 
-type GateOption func(*SkynetGate)
-
-// Disaptch a new client
-
-type GateAgent interface {
-	OnConnect(g Gate, conn net.Conn)
-}
-
 func assert(condition bool, msg string) {
 	if !condition {
 		panic(msg)
 	}
 }
 
-func NewGate(opt ...GateOption) *SkynetGate {
-	g := &SkynetGate{}
+func NewGate(opt ...GateOption) *skynetGate {
+	g := &skynetGate{}
 	for _, o := range opt {
 		o(g)
 	}
@@ -52,7 +50,7 @@ func NewGate(opt ...GateOption) *SkynetGate {
 	return g
 }
 
-func (g *SkynetGate) Start() (err error) {
+func (g *skynetGate) Start() (err error) {
 	g.listener, err = net.Listen("tcp", g.address)
 	if err != nil {
 		return err
@@ -62,7 +60,7 @@ func (g *SkynetGate) Start() (err error) {
 	return nil
 }
 
-func (g *SkynetGate) listenLoop() {
+func (g *skynetGate) listenLoop() {
 	for {
 		conn, err := g.listener.Accept()
 		if err != nil {
@@ -78,37 +76,36 @@ func (g *SkynetGate) listenLoop() {
 	}
 }
 
-func (g *SkynetGate) Address() string {
+func (g *skynetGate) Address() string {
 	return g.address
 }
 
-func (g *SkynetGate) Stop() {
+func (g *skynetGate) Stop() {
 	g.listener.Close()
 }
 
-func (g *SkynetGate) AddClient() {
+func (g *skynetGate) AddClient() {
 	atomic.AddInt32(&g.clientCount, 1)
 }
 
-func (g *SkynetGate) RemoveClient() {
+func (g *skynetGate) RemoveClient() {
 	atomic.AddInt32(&g.clientCount, -1)
-	log.Printf("client count %d", g.clientCount)
 }
 
 func WithAddress(address string) GateOption {
-	return func(g *SkynetGate) {
+	return func(g *skynetGate) {
 		g.address = address
 	}
 }
 
 func WithMaxClient(maxClient int32) GateOption {
-	return func(g *SkynetGate) {
+	return func(g *skynetGate) {
 		g.maxClient = maxClient
 	}
 }
 
 func WithAgent(agent GateAgent) GateOption {
-	return func(g *SkynetGate) {
+	return func(g *skynetGate) {
 		g.agent = agent
 	}
 }
