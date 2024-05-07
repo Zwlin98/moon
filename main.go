@@ -31,7 +31,7 @@ func main() {
 	// start cluster
 	clusterd.Open("moon")
 
-    // call Skynet
+	// call Skynet
 	value, err := cluster.Call("db", "SIMPLEDB", "GET", []lua.Value{lua.String("ping")})
 	if err != nil {
 		log.Println("call db error:", err)
