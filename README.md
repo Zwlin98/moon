@@ -12,6 +12,7 @@
 ## Examples
 
 service 文件夹中出给出了两个简单的示例: `http.go` 和 `example.go`, 展示了如何处理 Skynet 传递来的 Lua 对象。
+下面的例子展示了 Skynet 节点与 Moon 节点互相调用(call)的基本过程。
 
 ### main.go
 
@@ -35,7 +36,15 @@ func main() {
 	// start cluster
 	clusterd.Open("moon")
  	
-  select{}
+    // call Skynet
+	value, err := cluster.Call("db", "SIMPLEDB", "GET", []lua.Value{lua.String("ping")})
+	if err != nil {
+		log.Println("call db error:", err)
+	} else {
+		log.Println("call db result:", value)
+	}
+
+    select{} // block forever
 }
 ```
 

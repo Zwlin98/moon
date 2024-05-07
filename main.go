@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/Zwlin98/moon/cluster"
+	"github.com/Zwlin98/moon/lua"
 	"github.com/Zwlin98/moon/service"
 )
 
@@ -29,6 +30,14 @@ func main() {
 
 	// start cluster
 	clusterd.Open("moon")
+
+    // call Skynet
+	value, err := cluster.Call("db", "SIMPLEDB", "GET", []lua.Value{lua.String("ping")})
+	if err != nil {
+		log.Println("call db error:", err)
+	} else {
+		log.Println("call db result:", value)
+	}
 
 	signchan := make(chan os.Signal, 1)
 	signal.Notify(signchan, syscall.SIGINT, syscall.SIGQUIT, syscall.SIGTERM)
