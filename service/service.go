@@ -1,7 +1,7 @@
 package service
 
 import (
-	"moon/lua"
+	"github.com/Zwlin98/moon/lua"
 )
 
 type Service interface {

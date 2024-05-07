@@ -3,11 +3,12 @@ package cluster
 import (
 	"fmt"
 	"log"
-	"moon/gate"
-	"moon/lua"
-	"moon/service"
 	"net"
 	"sync"
+
+	"github.com/Zwlin98/moon/gate"
+	"github.com/Zwlin98/moon/lua"
+	"github.com/Zwlin98/moon/service"
 )
 
 type Clusterd interface {

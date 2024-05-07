@@ -3,9 +3,10 @@ package cluster
 import (
 	"fmt"
 	"log"
-	"moon/gate"
-	"moon/lua"
 	"net"
+
+	"github.com/Zwlin98/moon/gate"
+	"github.com/Zwlin98/moon/lua"
 )
 
 type ClusterAgent interface {
