@@ -4,12 +4,13 @@ import (
 	"log"
 	"os"
 	"os/signal"
-	"syscall"
+	"sync"
 	"time"
 
 	"github.com/Zwlin98/moon/cluster"
 	"github.com/Zwlin98/moon/lua"
 	"github.com/Zwlin98/moon/service"
+	"golang.org/x/sys/unix"
 )
 
 func main() {
@@ -32,16 +33,38 @@ func main() {
 	clusterd.Open("moon")
 
 	// call Skynet
-	value, err := cluster.Call("db", "SIMPLEDB", "GET", []lua.Value{lua.String("ping")})
-	if err != nil {
-		log.Println("call db error:", err)
-	} else {
-		log.Println("call db result:", value)
+	callOnce := func(idx int) {
+		if idx%2 == 1 {
+			_, err := cluster.Call("db", "sdb1", "GET", []lua.Value{lua.String("ping")})
+			if err != nil {
+				log.Println("call db error:", err)
+			}
+		} else {
+			_, err := cluster.Call("db", "sdb2", "GET", []lua.Value{lua.String("ping")})
+			if err != nil {
+				log.Println("call db error:", err)
+			}
+		}
 	}
 
-	signchan := make(chan os.Signal, 1)
-	signal.Notify(signchan, syscall.SIGINT, syscall.SIGQUIT, syscall.SIGTERM)
-	sign := <-signchan
-	log.Println("receive sign program stop:", sign)
-	time.Sleep(time.Second * 1)
+	cnt := 50000
+	start := time.Now()
+	var wg sync.WaitGroup
+	for i := range cnt {
+		wg.Add(1)
+		go func(x int) {
+			defer wg.Done()
+			callOnce(x)
+		}(i)
+	}
+	wg.Wait()
+
+	log.Printf("call db %d times cost: %s\n", cnt, time.Since(start))
+
+	term := make(chan os.Signal, 1)
+
+	signal.Notify(term, unix.SIGTERM)
+	signal.Notify(term, os.Interrupt)
+
+	<-term
 }

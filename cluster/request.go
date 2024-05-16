@@ -61,6 +61,7 @@ func UnpackRequest(data []byte) (Request, error) {
 		return r, fmt.Errorf("request type is not supported")
 	}
 }
+
 func unpackSingleRequest(data []byte) (Request, error) {
 	var r = Request{}
 	switch data[0] {

@@ -25,6 +25,8 @@ type Clusterd interface {
 }
 
 type skynetClusterd struct {
+	sync.Mutex
+
 	config ClusterConfig
 
 	namedServices map[string]service.Service
@@ -128,8 +130,8 @@ func (c *skynetClusterd) fetchSender(name string) Sender {
 	if client, ok := c.nodeSender.Load(name); ok {
 		return client.(Sender)
 	}
-	mutex.Lock()
-	defer mutex.Unlock()
+	c.Lock()
+	defer c.Unlock()
 	// fetch again
 	if client, ok := c.nodeSender.Load(name); ok {
 		return client.(Sender)
