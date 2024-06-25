@@ -55,7 +55,7 @@ func (ca *skynetClusterAgent) Start() {
 	// Read msg from client
 	go func() {
 		for {
-			msg, err := proto.ReadMsg()
+			msg, err := proto.Read()
 			if err != nil {
 				log.Printf("ClusterAgent %s read error: %s", ca.conn.RemoteAddr(), err)
 				ca.Exit()
@@ -74,10 +74,8 @@ func (ca *skynetClusterAgent) Start() {
 				return
 			case resp := <-ca.respChan:
 				packedResponse, _ := PackResponse(resp)
-				proto.WriteMsg(packedResponse.Data)
-				for _, msg := range packedResponse.Multi {
-					proto.WriteMsg(msg)
-				}
+				proto.Write(packedResponse.Data)
+				proto.WriteBatch(packedResponse.Multi)
 			}
 		}
 	}()

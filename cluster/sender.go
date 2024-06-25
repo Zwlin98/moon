@@ -62,7 +62,7 @@ func (sc *skynetSender) Start() {
 
 	go func() {
 		for {
-			msg, err := proto.ReadMsg()
+			msg, err := proto.Read()
 			if err != nil {
 				log.Printf("ClusterClient %s failed to read message, %s", sc.name(), err.Error())
 				sc.Exit()
@@ -79,19 +79,17 @@ func (sc *skynetSender) Start() {
 				log.Printf("ClusterClient %s exited [W]", sc.name())
 				return
 			case req := <-sc.reqChan:
-				err := proto.WriteMsg(req.Data)
+				err := proto.Write(req.Data)
 				if err != nil {
 					log.Printf("ClusterClient %s failed to write message, %s", sc.name(), err.Error())
 					sc.Exit()
 					return
 				}
-				for _, part := range req.Multi {
-					err = proto.WriteMsg(part)
-					if err != nil {
-						log.Printf("ClusterClient %s failed to write message, %s", sc.name(), err.Error())
-						sc.Exit()
-						return
-					}
+				err = proto.WriteBatch(req.Multi)
+				if err != nil {
+					log.Printf("ClusterClient %s failed to write batch message, %s", sc.name(), err.Error())
+					sc.Exit()
+					return
 				}
 			}
 		}
