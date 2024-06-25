@@ -1,0 +1,6 @@
+services:
+  moon:
+    build: .
+    ports:
+      - "3345:3345"
+    restart: always
