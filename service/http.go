@@ -5,11 +5,12 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 
-    "github.com/Zwlin98/moon/lua"
+	"github.com/Zwlin98/moon/lua"
 )
 
-type httpRequest struct {
+type request struct {
 	method   string
 	headers  map[string]string
 	body     string
@@ -17,10 +18,12 @@ type httpRequest struct {
 	noHeader bool
 }
 
-type httpFunc func(url string, req httpRequest) ([]lua.Value, error)
+type httpFunc func(url string, req request) ([]lua.Value, error)
 
-type HttpService struct {
-	method map[string]httpFunc
+type HttpService struct{}
+
+func NewHttpService() Service {
+	return &HttpService{}
 }
 
 func (s *HttpService) Execute(args []lua.Value) (ret []lua.Value, err error) {
@@ -56,9 +59,8 @@ func (s *HttpService) Execute(args []lua.Value) (ret []lua.Value, err error) {
 	noBody := opts.Hash[lua.String("noBody")].(lua.Boolean)
 	noHeader := opts.Hash[lua.String("noHeader")].(lua.Boolean)
 
-	f, ok := s.method[string(method)]
-	if !ok {
-		return buildError("method not found"), nil
+	if !checkMethod(string(method)) {
+		return buildError("method not allowed"), nil
 	}
 
 	reqHeaders := make(map[string]string)
@@ -66,7 +68,7 @@ func (s *HttpService) Execute(args []lua.Value) (ret []lua.Value, err error) {
 		reqHeaders[string(k.(lua.String))] = string(v.(lua.String))
 	}
 
-	return f(string(url), httpRequest{
+	return httpRequest(string(url), request{
 		method:   string(method),
 		headers:  reqHeaders,
 		body:     string(body),
@@ -75,28 +77,24 @@ func (s *HttpService) Execute(args []lua.Value) (ret []lua.Value, err error) {
 	})
 }
 
-func NewHttpService() Service {
-	svc := HttpService{
-		method: make(map[string]httpFunc),
+func checkMethod(method string) bool {
+	switch method {
+	case "GET", "POST", "PUT", "DELETE", "PATCH":
+		return true
+	default:
+		return false
 	}
-	svc.method["GET"] = httpGet
-	svc.method["POST"] = httpPost
-	return &svc
 }
 
-func httpGet(url string, req httpRequest) ([]lua.Value, error) {
-	resp, err := http.Get(url)
+func httpRequest(url string, req request) ([]lua.Value, error) {
+	r, err := http.NewRequest(req.method, url, strings.NewReader(req.body))
 	if err != nil {
 		return buildError(err.Error()), nil
 	}
-
-	return buildResponse(resp, req.noHeader, req.noBody), nil
-}
-
-func httpPost(url string, req httpRequest) ([]lua.Value, error) {
-	buf := bytes.NewBufferString(req.body)
-	contentType := req.headers["Content-Type"]
-	resp, err := http.Post(url, contentType, buf)
+	for k, v := range req.headers {
+		r.Header.Set(k, v)
+	}
+	resp, err := http.DefaultClient.Do(r)
 	if err != nil {
 		return buildError(err.Error()), nil
 	}
