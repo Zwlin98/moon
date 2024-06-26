@@ -99,7 +99,7 @@ func packMultiResponse(r Response) (PackedResponse, error) {
 
 	part := int((msgSize - 1/MULTI_PART) + 1)
 	for i := 0; i < part; i++ {
-        bufPart := bytes.NewBuffer(nil)
+		bufPart := bytes.NewBuffer(nil)
 		var s uint32
 		var respType uint8
 		if msgSize > MULTI_PART {
@@ -110,16 +110,18 @@ func packMultiResponse(r Response) (PackedResponse, error) {
 			respType = RESPONSE_MULTI_END
 		}
 		// 4 bytes for session
-        binary.Write(bufPart, binary.LittleEndian, r.Session)
+		binary.Write(bufPart, binary.LittleEndian, r.Session)
 		// 1 byte for request type
-        bufPart.WriteByte(respType)
+		bufPart.WriteByte(respType)
 
 		partStart := i * int(MULTI_PART)
 		partEnd := partStart + int(s)
 		// copy msg
-        bufPart.Write(r.Msg[partStart:partEnd])
+		bufPart.Write(r.Msg[partStart:partEnd])
 
 		pr.Multi = append(pr.Multi, bufPart.Bytes())
+
+		msgSize -= s
 	}
 
 	return pr, nil
