@@ -97,7 +97,7 @@ func packMultiResponse(r Response) (PackedResponse, error) {
 	// 4 bytes for msg size
 	binary.LittleEndian.PutUint32(pr.Data[5:], msgSize)
 
-	part := int((msgSize - 1/MULTI_PART) + 1)
+	part := int((msgSize-1)/MULTI_PART + 1)
 	for i := 0; i < part; i++ {
 		bufPart := bytes.NewBuffer(nil)
 		var s uint32
@@ -116,6 +116,7 @@ func packMultiResponse(r Response) (PackedResponse, error) {
 
 		partStart := i * int(MULTI_PART)
 		partEnd := partStart + int(s)
+
 		// copy msg
 		bufPart.Write(r.Msg[partStart:partEnd])
 
