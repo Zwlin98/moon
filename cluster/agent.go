@@ -21,7 +21,7 @@ type skynetClusterAgent struct {
 
 	pendingReqs map[uint32]Request
 
-	respChan chan Response
+	respChan chan PackedResponse
 	exit     chan struct{}
 }
 
@@ -32,12 +32,12 @@ func NewClusterAgent(conn net.Conn, clusterd Clusterd) ClusterAgent {
 
 		pendingReqs: make(map[uint32]Request),
 
-		respChan: make(chan Response),
+		respChan: make(chan PackedResponse),
 		exit:     make(chan struct{}),
 	}
 }
 
-func (ca *skynetClusterAgent) safeSend(resp Response) bool {
+func (ca *skynetClusterAgent) safeSend(resp PackedResponse) bool {
 	select {
 	case <-ca.exit:
 		log.Printf("ClusterAgent %s exited", ca.conn.RemoteAddr())
@@ -48,7 +48,7 @@ func (ca *skynetClusterAgent) safeSend(resp Response) bool {
 }
 
 func (ca *skynetClusterAgent) Start() {
-	log.Printf("ClusterAgent start from %v", ca.conn.RemoteAddr())
+	log.Printf("ClusterAgent conneced from %v", ca.conn.RemoteAddr())
 
 	proto := gate.NewGateProto(ca.conn, ca.conn)
 
@@ -72,10 +72,9 @@ func (ca *skynetClusterAgent) Start() {
 			case <-ca.exit:
 				log.Printf("ClusterAgent %s response channel closed", ca.conn.RemoteAddr())
 				return
-			case resp := <-ca.respChan:
-				packedResponse, _ := PackResponse(resp)
-				proto.Write(packedResponse.Data)
-				proto.WriteBatch(packedResponse.Multi)
+			case packedResp := <-ca.respChan:
+				proto.Write(packedResp.Data)
+				proto.WriteBatch(packedResp.Multi)
 			}
 		}
 	}()
@@ -119,33 +118,45 @@ func (ca *skynetClusterAgent) execute(req Request) {
 			ca.sendError(req, fmt.Errorf("panic: %v", r))
 		}
 	}()
+
 	svc := ca.clusterd.Query(req.Address)
 	if svc == nil {
 		ca.sendError(req, fmt.Errorf("service not found: %v", req.Address))
 		return
 	}
-	Args, err := lua.Deserialize(req.Msg)
+
+	args, err := lua.Deserialize(req.Msg)
 	if err != nil {
 		ca.sendError(req, err)
 		return
 	}
-	ret, err := svc.Execute(Args)
+
+	ret, err := svc.Execute(args)
 	if err != nil {
 		ca.sendError(req, err)
 		return
 	}
+
 	if !req.IsPush {
-		packedRet, err := lua.Serialize(ret)
+		serialized, err := lua.Serialize(ret)
 
 		if err != nil {
 			ca.sendError(req, err)
 		}
+
 		resp := Response{
 			Ok:      true,
 			Session: req.Session,
-			Msg:     packedRet,
+			Msg:     serialized,
 		}
-		ok := ca.safeSend(resp)
+
+		packedResp, err := PackResponse(resp)
+
+		if err != nil {
+			ca.sendError(req, err)
+		}
+
+		ok := ca.safeSend(packedResp)
 		if !ok {
 			log.Printf("ClusterAgent %s send response failed", ca.conn.RemoteAddr())
 		}
@@ -155,11 +166,13 @@ func (ca *skynetClusterAgent) execute(req Request) {
 func (ca *skynetClusterAgent) sendError(req Request, err error) {
 	log.Printf("ClusterAgent %s send error: %s", ca.conn.RemoteAddr(), err)
 	ret := []lua.Value{lua.String(err.Error())}
-	packed, _ := lua.Serialize(ret)
+	serialized, _ := lua.Serialize(ret)
 	resp := Response{
 		Ok:      false,
 		Session: req.Session,
-		Msg:     packed,
+		Msg:     serialized,
 	}
-	ca.safeSend(resp)
+	packedResp, _ := PackResponse(resp)
+
+	ca.safeSend(packedResp)
 }
