@@ -13,6 +13,7 @@ import (
 func main() {
 	// initialize services
 	httpService := service.NewHttpService()
+	pingService := service.NewPingService()
 
 	// initialize cluster
 	clusterd := cluster.GetClusterd()
@@ -22,6 +23,7 @@ func main() {
 
 	// register services
 	clusterd.Register("http", httpService)
+	clusterd.Register("ping", pingService)
 
 	// start cluster
 	clusterd.Open("moon")
