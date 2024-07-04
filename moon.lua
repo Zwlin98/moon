@@ -19,6 +19,7 @@ local cluster = require("skynet.cluster")
 ---@return number code
 ---@return HttpResponse | nil response
 local function moonHttp(url, opts)
+	opts = opts or {}
 	opts.method = opts.method or "GET"
 	opts.headers = opts.headers or {}
 	opts.body = opts.body or ""
