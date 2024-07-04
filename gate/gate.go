@@ -1,7 +1,7 @@
 package gate
 
 import (
-	"log"
+	"log/slog"
 	"net"
 	"sync/atomic"
 )
@@ -55,7 +55,7 @@ func (g *skynetGate) Start() (err error) {
 	if err != nil {
 		return err
 	}
-	log.Printf("gate started at %s", g.address)
+	slog.Info("gate started", "address", g.address)
 	go g.listenLoop()
 	return nil
 }
@@ -64,14 +64,14 @@ func (g *skynetGate) listenLoop() {
 	for {
 		conn, err := g.listener.Accept()
 		if err != nil {
-			log.Printf("failed to accept new client, %s", err.Error())
+			slog.Error("failed to accept new client", "error", err.Error())
 			continue
 		}
 		if g.clientCount >= g.maxClient {
-			log.Printf("client count %d exceed max client %d", g.clientCount, g.maxClient)
+			slog.Warn("client count exceed max client", "clientCount", g.clientCount, "maxClient", g.maxClient)
 		}
-		log.Printf("new client connected from %s, current client num %d", conn.RemoteAddr().String(), g.clientCount)
 		g.AddClient()
+		slog.Info("new client connected", "remoteAddr", conn.RemoteAddr().String(), "clientCount", g.clientCount)
 		g.agent.OnConnect(g, conn)
 	}
 }

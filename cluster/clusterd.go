@@ -2,7 +2,7 @@ package cluster
 
 import (
 	"fmt"
-	"log"
+	"log/slog"
 	"net"
 	"sync"
 
@@ -147,7 +147,7 @@ func (c *skynetClusterd) fetchSender(name string) Sender {
 
 // OnSenderExit implements Clusterd.
 func (c *skynetClusterd) OnSenderExit(name string) {
-	log.Printf("client removed: %s", name)
+	slog.Info("client removed", "name", name)
 	c.nodeSender.Delete(name)
 }
 

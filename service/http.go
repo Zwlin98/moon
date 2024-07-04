@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"strings"
 
@@ -27,6 +28,7 @@ func NewHttpService() Service {
 func (s *HttpService) Execute(args []lua.Value) (ret []lua.Value, err error) {
 	defer func() {
 		if err := recover(); err != nil {
+			slog.Warn("http service panic", "err", err)
 			ret = buildError(fmt.Sprintf("http service panic: %v", err))
 			err = nil
 		}

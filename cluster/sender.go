@@ -2,7 +2,7 @@ package cluster
 
 import (
 	"fmt"
-	"log"
+	"log/slog"
 	"net"
 	"sync"
 	"sync/atomic"
@@ -64,7 +64,7 @@ func (sc *skynetSender) Start() {
 		for {
 			msg, err := proto.Read()
 			if err != nil {
-				log.Printf("ClusterClient %s failed to read message, %s", sc.name(), err.Error())
+				slog.Error("ClusterClient read error", "addr", sc.conn.RemoteAddr(), "error", err)
 				sc.Exit()
 				return
 			}
@@ -76,18 +76,18 @@ func (sc *skynetSender) Start() {
 		for {
 			select {
 			case <-sc.exit:
-				log.Printf("ClusterClient %s exited [W]", sc.name())
+				slog.Info("ClusterClient exited", "name", sc.name())
 				return
 			case req := <-sc.reqChan:
 				err := proto.Write(req.Data)
 				if err != nil {
-					log.Printf("ClusterClient %s failed to write message, %s", sc.name(), err.Error())
+					slog.Error("ClusterClient failed to write message", "name", sc.name(), "error", err)
 					sc.Exit()
 					return
 				}
 				err = proto.WriteBatch(req.Multi)
 				if err != nil {
-					log.Printf("ClusterClient %s failed to write batch message, %s", sc.name(), err.Error())
+					slog.Error("ClusterClient failed to write batch message", "name", sc.name(), "error", err)
 					sc.Exit()
 					return
 				}
@@ -102,7 +102,7 @@ func (sc *skynetSender) callRet(resp Response) {
 	if ok {
 		retChan.(chan Response) <- resp
 	} else {
-		log.Printf("session %d, ClusterClient %s callRet failed, no pending response", session, sc.name())
+		slog.Error("ClusterClient callRet failed, no pending response", "session", session, "name", sc.name())
 	}
 }
 
@@ -181,7 +181,7 @@ func (sc *skynetSender) Send(service string, method string, args []lua.Value) er
 }
 
 func (sc *skynetSender) Exit() {
-	log.Printf("ClusterClient %s exit", sc.name())
+	slog.Info("ClusterClient exit", "name", sc.name())
 	close(sc.exit)
 	sc.conn.Close()
 	sc.clusterd.OnSenderExit(sc.name())
@@ -194,7 +194,7 @@ func (sc *skynetSender) RemoteAddr() string {
 func (sc *skynetSender) dispatch(msg []byte) {
 	resp, err := UnpackResponse(msg)
 	if err != nil {
-		log.Printf("failed to unpack response, %s", err.Error())
+		slog.Error("failed to unpack response", "error", err)
 		return
 	}
 	switch resp.Padding {
@@ -205,7 +205,7 @@ func (sc *skynetSender) dispatch(msg []byte) {
 	case RESPONSE_MULTI_PART:
 		prevResp, ok := sc.pendingResponse[resp.Session]
 		if !ok {
-			log.Printf("unexpected multi part response")
+			slog.Warn("unexpected multi part response")
 			sc.callError(resp.Session, "unexpected multi part response")
 			return
 		} else {
@@ -215,7 +215,7 @@ func (sc *skynetSender) dispatch(msg []byte) {
 	case RESPONSE_MULTI_END:
 		prevResp, ok := sc.pendingResponse[resp.Session]
 		if !ok {
-			log.Printf("unexpected multi end response")
+			slog.Warn("unexpected multi end response")
 			sc.callError(resp.Session, "unexpected multi end response")
 			return
 		} else {

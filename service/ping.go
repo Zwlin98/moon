@@ -2,6 +2,7 @@ package service
 
 import (
 	"fmt"
+	"log/slog"
 
 	"github.com/Zwlin98/moon/lua"
 )
@@ -15,6 +16,7 @@ func NewPingService() Service {
 func (s *PingService) Execute(args []lua.Value) (ret []lua.Value, err error) {
 	defer func() {
 		if err := recover(); err != nil {
+			slog.Warn("ping service panic", "err", err)
 			ret = []lua.Value{lua.String("error panic")}
 			err = fmt.Errorf("panic: %v", err)
 		}

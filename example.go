@@ -1,7 +1,7 @@
 package main
 
 import (
-	"log"
+	"log/slog"
 	"os"
 	"os/signal"
 
@@ -27,7 +27,7 @@ func main() {
 	// start cluster
 	clusterd.Open("moon")
 
-	log.Printf("moon start")
+	slog.Info("moon started")
 
 	term := make(chan os.Signal, 1)
 
