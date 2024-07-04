@@ -50,6 +50,7 @@ func main() {
 
 ```lua
 local function moonHttp(url, opts)
+	opts = opts or {}
 	opts.method = opts.method or "GET"
 	opts.headers = opts.headers or {}
 	opts.body = opts.body or ""
