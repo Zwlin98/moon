@@ -18,6 +18,7 @@ type ClusterAgent interface {
 type skynetClusterAgent struct {
 	conn     net.Conn
 	clusterd Clusterd
+	gate     gate.Gate
 
 	pendingReqs map[uint32]Request
 
@@ -25,10 +26,11 @@ type skynetClusterAgent struct {
 	exit     chan struct{}
 }
 
-func NewClusterAgent(conn net.Conn, clusterd Clusterd) ClusterAgent {
+func NewClusterAgent(gate gate.Gate, conn net.Conn, clusterd Clusterd) ClusterAgent {
 	return &skynetClusterAgent{
 		conn:     conn,
 		clusterd: clusterd,
+		gate:     gate,
 
 		pendingReqs: make(map[uint32]Request),
 
@@ -84,6 +86,7 @@ func (ca *skynetClusterAgent) Start() {
 func (ca *skynetClusterAgent) Exit() {
 	log.Printf("ClusterAgent %s exit", ca.conn.RemoteAddr())
 	close(ca.exit)
+	ca.gate.RemoveClient()
 	(ca.conn).Close()
 }
 

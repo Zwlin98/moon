@@ -18,8 +18,6 @@ type request struct {
 	noHeader bool
 }
 
-type httpFunc func(url string, req request) ([]lua.Value, error)
-
 type HttpService struct{}
 
 func NewHttpService() Service {

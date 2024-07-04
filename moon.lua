@@ -1,27 +1,50 @@
 local skynet = require("skynet")
 local cluster = require("skynet.cluster")
 
+---@class HttpOpts
+---@field method string
+---@field headers table | nil
+---@field body string | nil
+---@field noBody boolean | nil
+---@field noHeader boolean | nil
+
+---@class HttpResponse
+---@field headers table
+---@field body string
+
+---comment
+---@param url string
+---@param opts HttpOpts
+---@return boolean ok
+---@return number code
+---@return HttpResponse | nil response
+local function moonHttp(url, opts)
+	opts.method = opts.method or "GET"
+	opts.headers = opts.headers or {}
+	opts.body = opts.body or ""
+
+	opts.noBody = opts.noBody or false
+	if opts.noHeader == nil then
+		opts.noHeader = true
+	end
+	local ok, msg, code, resp = pcall(cluster.call, "moon", "http", "request", url, opts)
+	if ok then
+		return msg, code, resp
+	else
+		return false, msg
+	end
+end
+
 skynet.start(function()
 	cluster.reload({
-		db = "127.0.0.1:2528",
 		moon = "127.0.0.1:3345",
 	})
 
-	local sdb = skynet.newservice("simpledb")
-	skynet.call(sdb, "lua", "SET", "ping", "pong")
+	local ok, code, resp = moonHttp("https://www..com", { method = "GET" })
 
-	cluster.register("sdb", sdb)
-
-	cluster.open("db")
-
-	local ok, s, t = cluster.call("moon", "example", "CMD", "arg1", { a = 1, b = 2, c = 3 })
-	if ok then
-		skynet.error("call moon example CMD success")
-		skynet.error(s)
-		for k, v in pairs(t) do
-			skynet.error(k, v)
-		end
+	if ok and resp then
+		skynet.error(resp.body)
 	else
-		skynet.error("call moon example CMD failed")
+		skynet.error(code)
 	end
 end)

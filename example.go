@@ -7,7 +7,6 @@ import (
 
 	"github.com/Zwlin98/moon/cluster"
 	"github.com/Zwlin98/moon/service"
-	"golang.org/x/sys/unix"
 )
 
 func main() {
@@ -32,7 +31,6 @@ func main() {
 
 	term := make(chan os.Signal, 1)
 
-	signal.Notify(term, unix.SIGTERM)
 	signal.Notify(term, os.Interrupt)
 
 	<-term

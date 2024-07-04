@@ -152,7 +152,7 @@ func (c *skynetClusterd) OnSenderExit(name string) {
 }
 
 func (c *skynetClusterd) OnConnect(gate gate.Gate, conn net.Conn) {
-	agent := NewClusterAgent(conn, c)
+	agent := NewClusterAgent(gate, conn, c)
 	agent.Start()
 }
 

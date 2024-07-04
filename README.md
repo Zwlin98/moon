@@ -12,72 +12,74 @@
 ## Examples
 
 service 文件夹中出给出了两个简单的示例: `http.go` 和 `example.go`, 展示了如何处理 Skynet 传递来的 Lua 对象。
-下面的例子展示了 Skynet 节点与 Moon 节点互相调用(call)的基本过程。
+下面的例子展示了 Skynet 节点调用 Moon 节点上 HTTP 服务(call) 的过程，HTTP 是 Moon 自带的一个用于处理 http 请求的服务,
+可以用于替换 Skynet 自带的 http 服务。
 
-### main.go
+### example.go
 
 ```go
 func main() {
 	// initialize services
 	httpService := service.NewHttpService()
-	exampleService := service.NewExampleService()
+	pingService := service.NewPingService()
 
 	// initialize cluster
 	clusterd := cluster.GetClusterd()
 	clusterd.Reload(cluster.DefaultConfig{
-		"moon": "127.0.0.1:3345",
-		"db":   "127.0.0.1:2528",
+		"moon": "0.0.0.0:3345",
 	})
 
 	// register services
 	clusterd.Register("http", httpService)
-	clusterd.Register("example", exampleService)
+	clusterd.Register("ping", pingService)
 
 	// start cluster
 	clusterd.Open("moon")
- 	
-    // call Skynet
-	value, err := cluster.Call("db", "SIMPLEDB", "GET", []lua.Value{lua.String("ping")})
-	if err != nil {
-		log.Println("call db error:", err)
-	} else {
-		log.Println("call db result:", value)
-	}
 
-    select{} // block forever
+	log.Printf("moon start")
+
+	term := make(chan os.Signal, 1)
+
+	signal.Notify(term, os.Interrupt)
+
+	<-term
 }
 ```
 
 ### moon.lua
 
 ```lua
-local skynet = require("skynet")
-local cluster = require("skynet.cluster")
+local function moonHttp(url, opts)
+	opts.method = opts.method or "GET"
+	opts.headers = opts.headers or {}
+	opts.body = opts.body or ""
+
+	opts.noBody = opts.noBody or false
+	if opts.noHeader == nil then
+		opts.noHeader = true
+	end
+	local ok, msg, code, resp = pcall(cluster.call, "moon", "http", "request", url, opts)
+	if ok then
+		return msg, code, resp
+	else
+		return false, msg
+	end
+end
 
 skynet.start(function()
 	cluster.reload({
-		db = "127.0.0.1:2528",
 		moon = "127.0.0.1:3345",
 	})
 
-	local sdb = skynet.newservice("simpledb")
-	skynet.call(sdb, "lua", "SET", "ping", "pong")
+	local ok, code, resp = moonHttp("https://www..com", { method = "GET" })
 
-	cluster.register("sdb", sdb)
-
-	cluster.open("db")
-
-	local ok, s, t = cluster.call("moon", "example", "CMD", "arg1", { a = 1, b = 2, c = 3 })
-	if ok then
-		skynet.error("call moon example CMD success")
-		skynet.error(s)
-		for k, v in pairs(t) do
-			skynet.error(k, v)
-		end
+	if ok and resp then
+		skynet.error(resp.body)
 	else
-		skynet.error("call moon example CMD failed")
+		skynet.error(code)
 	end
 end)
+
 ```
 
 ### config.moon

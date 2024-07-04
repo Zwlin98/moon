@@ -70,7 +70,7 @@ func (g *skynetGate) listenLoop() {
 		if g.clientCount >= g.maxClient {
 			log.Printf("client count %d exceed max client %d", g.clientCount, g.maxClient)
 		}
-		log.Printf("new client connected from %s", conn.RemoteAddr().String())
+		log.Printf("new client connected from %s, current client num %d", conn.RemoteAddr().String(), g.clientCount)
 		g.AddClient()
 		g.agent.OnConnect(g, conn)
 	}
