@@ -12,6 +12,7 @@ import (
 )
 
 type request struct {
+	url      string
 	method   string
 	headers  map[string]string
 	body     string
@@ -25,58 +26,6 @@ func NewHttpService() Service {
 	return &HttpService{}
 }
 
-func (s *HttpService) Execute(args []lua.Value) (ret []lua.Value, err error) {
-	defer func() {
-		if err := recover(); err != nil {
-			slog.Warn("http service panic", "err", err)
-			ret = buildError(fmt.Sprintf("http service panic: %v", err))
-			err = nil
-		}
-	}()
-
-	// 参数检查和处理
-	if len(args) < 3 {
-		return buildError("args not enough"), nil
-	}
-	cmd, ok := args[0].(lua.String)
-	if !ok || cmd != "request" {
-		return buildError("command not found"), nil
-	}
-
-	url, ok := args[1].(lua.String)
-	if !ok {
-		return buildError("url parse error"), nil
-	}
-
-	opts, ok := args[2].(lua.Table)
-	if !ok {
-		return buildError("opts parse error"), nil
-	}
-
-	method := opts.Hash[lua.String("method")].(lua.String)
-	headers := opts.Hash[lua.String("headers")].(lua.Table)
-	body := opts.Hash[lua.String("body")].(lua.String)
-	noBody := opts.Hash[lua.String("noBody")].(lua.Boolean)
-	noHeader := opts.Hash[lua.String("noHeader")].(lua.Boolean)
-
-	if !checkMethod(string(method)) {
-		return buildError("method not allowed"), nil
-	}
-
-	reqHeaders := make(map[string]string)
-	for k, v := range headers.Hash {
-		reqHeaders[string(k.(lua.String))] = string(v.(lua.String))
-	}
-
-	return httpRequest(string(url), request{
-		method:   string(method),
-		headers:  reqHeaders,
-		body:     string(body),
-		noBody:   bool(noBody),
-		noHeader: bool(noHeader),
-	})
-}
-
 func checkMethod(method string) bool {
 	switch method {
 	case "GET", "POST", "PUT", "DELETE", "PATCH":
@@ -86,8 +35,72 @@ func checkMethod(method string) bool {
 	}
 }
 
-func httpRequest(url string, req request) ([]lua.Value, error) {
-	r, err := http.NewRequest(req.method, url, strings.NewReader(req.body))
+func parseArgs(args []lua.Value) (request, error) {
+	var req request
+	// 参数检查和处理
+	if len(args) < 3 {
+		return req, fmt.Errorf("args length error")
+	}
+	cmd, ok := args[0].(lua.String)
+	if !ok || cmd != "request" {
+		return req, fmt.Errorf("cmd parse error")
+	}
+
+	url, ok := args[1].(lua.String)
+	if !ok {
+		return req, fmt.Errorf("url parse error")
+	}
+
+	opts, ok := args[2].(lua.Table)
+	if !ok {
+		return req, fmt.Errorf("opts parse error")
+	}
+
+	method := opts.Hash[lua.String("method")].(lua.String)
+	headers := opts.Hash[lua.String("headers")].(lua.Table)
+	body := opts.Hash[lua.String("body")].(lua.String)
+	noBody := opts.Hash[lua.String("noBody")].(lua.Boolean)
+	noHeader := opts.Hash[lua.String("noHeader")].(lua.Boolean)
+
+	if !checkMethod(string(method)) {
+		return req, fmt.Errorf("method error")
+	}
+
+	reqHeaders := make(map[string]string)
+	for k, v := range headers.Hash {
+		reqHeaders[string(k.(lua.String))] = string(v.(lua.String))
+	}
+
+	return request{
+		url:      string(url),
+		method:   string(method),
+		headers:  reqHeaders,
+		body:     string(body),
+		noBody:   bool(noBody),
+		noHeader: bool(noHeader),
+	}, nil
+
+}
+
+func (s *HttpService) Execute(args []lua.Value) (ret []lua.Value, err error) {
+	defer func() {
+		if err := recover(); err != nil {
+			slog.Warn("http service panic", "err", err)
+			ret = buildError(fmt.Sprintf("http service panic: %v", err))
+			err = nil
+		}
+	}()
+
+	req, err := parseArgs(args)
+	if err != nil {
+		return buildError(err.Error()), nil
+	}
+
+	return httpRequest(req)
+}
+
+func httpRequest(req request) ([]lua.Value, error) {
+	r, err := http.NewRequest(req.method, req.url, strings.NewReader(req.body))
 	if err != nil {
 		return buildError(err.Error()), nil
 	}
