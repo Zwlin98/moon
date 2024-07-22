@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/Zwlin98/moon/lua"
 )
@@ -20,10 +21,21 @@ type request struct {
 	noHeader bool
 }
 
-type HttpService struct{}
+type HttpService struct {
+	client *http.Client
+}
 
 func NewHttpService() Service {
-	return &HttpService{}
+	return &HttpService{
+		client: &http.Client{
+			Timeout: 10 * time.Second,
+			Transport: &http.Transport{
+				MaxIdleConns:        128,
+				MaxIdleConnsPerHost: 64,
+				IdleConnTimeout:     90 * time.Second,
+			},
+		},
+	}
 }
 
 func checkMethod(method string) bool {
@@ -96,10 +108,10 @@ func (s *HttpService) Execute(args []lua.Value) (ret []lua.Value, err error) {
 		return buildError(err.Error()), nil
 	}
 
-	return httpRequest(req)
+	return s.httpRequest(req)
 }
 
-func httpRequest(req request) ([]lua.Value, error) {
+func (s *HttpService) httpRequest(req request) ([]lua.Value, error) {
 	r, err := http.NewRequest(req.method, req.url, strings.NewReader(req.body))
 	if err != nil {
 		return buildError(err.Error()), nil
@@ -107,7 +119,7 @@ func httpRequest(req request) ([]lua.Value, error) {
 	for k, v := range req.headers {
 		r.Header.Set(k, v)
 	}
-	resp, err := http.DefaultClient.Do(r)
+	resp, err := s.client.Do(r)
 	if err != nil {
 		return buildError(err.Error()), nil
 	}
@@ -148,6 +160,9 @@ func buildResponse(resp *http.Response, noHeader bool, noBody bool) []lua.Value 
 		buf := bytes.NewBuffer(nil)
 		io.Copy(buf, resp.Body)
 		hash[lua.String("body")] = lua.String(buf.String())
+	} else {
+		io.Copy(io.Discard, resp.Body)
+		resp.Body.Close()
 	}
 
 	ret = append(ret, lua.Table{Hash: hash})
