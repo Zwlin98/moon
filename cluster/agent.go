@@ -168,6 +168,9 @@ func (ca *skynetClusterAgent) execute(req Request) {
 
 func (ca *skynetClusterAgent) sendError(req Request, err error) {
 	slog.Warn("ClusterAgent send error", "addr", ca.conn.RemoteAddr(), "error", err)
+	if req.IsPush {
+		return
+	}
 	ret := []lua.Value{lua.String(err.Error())}
 	serialized, _ := lua.Serialize(ret)
 	resp := Response{
