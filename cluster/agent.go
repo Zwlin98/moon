@@ -145,6 +145,7 @@ func (ca *skynetClusterAgent) execute(req Request) {
 
 		if err != nil {
 			ca.sendError(req, err)
+			return
 		}
 
 		resp := Response{
@@ -157,6 +158,7 @@ func (ca *skynetClusterAgent) execute(req Request) {
 
 		if err != nil {
 			ca.sendError(req, err)
+			return
 		}
 
 		ok := ca.safeSend(packedResp)
